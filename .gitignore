@@ -27,3 +27,4 @@ DerivedData/
 *.xccheckout
 *.xcscmblueprint
 
+*.plist

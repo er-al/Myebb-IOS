@@ -6,9 +6,13 @@
 //
 
 import SwiftUI
+import GoogleSignIn
 
 @main
 struct MyebbApp: App {
+    // Bridge UIKit app delegate for URL handling (Google Sign-In callbacks).
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+
     var body: some Scene {
         WindowGroup {
             ContentView()

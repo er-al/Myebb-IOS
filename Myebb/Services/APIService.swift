@@ -63,13 +63,13 @@ class APIService {
     
     // MARK: - Authentication
     
-    func register(email: String, password: String) async throws -> LoginResponse {
+    func register(email: String, password: String, name: String) async throws -> LoginResponse {
         let url = URL(string: "\(baseURL)/auth/register")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
-        let body = RegisterRequest(email: email, password: password)
+        let body = RegisterRequest(email: email, password: password, name: name)
         request.httpBody = try jsonEncoder.encode(body)
         
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -113,6 +113,112 @@ class APIService {
         }
         
         return try jsonDecoder.decode(LoginResponse.self, from: data)
+    }
+
+    func loginWithGoogle(idToken: String) async throws -> LoginResponse {
+        try await socialLogin(path: "/auth/google", token: idToken)
+    }
+
+
+    private func socialLogin(path: String, token: String) async throws -> LoginResponse {
+        let url = URL(string: "\(baseURL)\(path)")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body = SocialLoginRequest(token: token)
+        request.httpBody = try jsonEncoder.encode(body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            if let errorData = try? jsonDecoder.decode([String: String].self, from: data),
+               let errorMessage = errorData["error"] {
+                throw APIError.serverError(errorMessage)
+            }
+            throw APIError.serverError("Login failed")
+        }
+
+        return try jsonDecoder.decode(LoginResponse.self, from: data)
+    }
+
+    // MARK: - Profile
+    
+    func getProfile() async throws -> User {
+        guard let token = AuthManager.shared.token else {
+            throw APIError.unauthorized
+        }
+        
+        let url = URL(string: "\(baseURL)/profile")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            if httpResponse.statusCode == 401 {
+                throw APIError.unauthorized
+            }
+            if let errorData = try? jsonDecoder.decode([String: String].self, from: data),
+               let errorMessage = errorData["error"] {
+                throw APIError.serverError(errorMessage)
+            }
+            throw APIError.serverError("Failed to load profile")
+        }
+        
+        let user = try jsonDecoder.decode(User.self, from: data)
+        AuthManager.shared.updateUser(user)
+        return user
+    }
+    
+    func updateProfile(name: String?, avatarDataURL: String?) async throws -> User {
+        guard let token = AuthManager.shared.token else {
+            throw APIError.unauthorized
+        }
+        
+        let trimmedName = name?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedAvatar = avatarDataURL?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let body = ProfileUpdateRequest(
+            name: trimmedName?.isEmpty == true ? nil : trimmedName,
+            avatarURL: trimmedAvatar?.isEmpty == true ? nil : trimmedAvatar
+        )
+        
+        let url = URL(string: "\(baseURL)/profile")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try jsonEncoder.encode(body)
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            if httpResponse.statusCode == 401 {
+                throw APIError.unauthorized
+            }
+            if let errorData = try? jsonDecoder.decode([String: String].self, from: data),
+               let errorMessage = errorData["error"] {
+                throw APIError.serverError(errorMessage)
+            }
+            throw APIError.serverError("Failed to update profile")
+        }
+        
+        let user = try jsonDecoder.decode(User.self, from: data)
+        AuthManager.shared.updateUser(user)
+        return user
     }
     
     // MARK: - Mood Management

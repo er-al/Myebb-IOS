@@ -139,7 +139,7 @@ struct DashboardView: View {
                             .foregroundColor(.white.opacity(0.9))
                             .fixedSize(horizontal: false, vertical: true)
                         
-                        HStack(spacing: 12) {
+                        HStack(spacing: 16) {
                             metricChip(title: "Avg Up", value: String(format: "%.1f", upIntensity), icon: "arrow.up", color: Color.white.opacity(0.2))
                             metricChip(title: "Avg Down", value: String(format: "%.1f", downIntensity), icon: "arrow.down", color: Color.white.opacity(0.15))
                         }
@@ -152,30 +152,33 @@ struct DashboardView: View {
     }
     
     private func metricChip(title: String, value: String, icon: String, color: Color) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.caption)
                 .foregroundColor(.white)
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 1) {
                 Text(title.uppercased())
                     .font(.caption2)
                     .foregroundColor(.white.opacity(0.7))
+                    .fixedSize(horizontal: true, vertical: false)
                 Text(value)
                     .font(.subheadline)
                     .foregroundColor(.white)
+                    .fixedSize(horizontal: true, vertical: false)
             }
         }
-        .padding(.vertical, 6)
-        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .padding(.horizontal, 12)
         .background(color)
         .cornerRadius(12)
+        .frame(minWidth: 80)
     }
     
     private func coreMetrics(_ stats: DashboardStats) -> some View {
         let items: [MetricCard] = [
             MetricCard(title: "Win Rate", value: stats.winRateFormatted, detail: stats.momentumText, icon: "sparkle", gradient: [ColorTheme.stemGreen, ColorTheme.moodUpGreen]),
             MetricCard(title: "Entries", value: "\(stats.totalEntries)", detail: selectedRange == .weekly ? "This week" : "This period", icon: "calendar", gradient: [ColorTheme.lakeBlue, ColorTheme.lilyLavender]),
-            MetricCard(title: "MMR", value: "\(stats.mmrScore)", detail: "Momentum score", icon: "bolt.fill", gradient: [ColorTheme.petalRose, ColorTheme.peachOrange])
+            MetricCard(title: "Momentum", value: momentumScoreDisplay(for: stats), detail: "Your emotional flow", icon: "bolt.fill", gradient: [ColorTheme.petalRose, ColorTheme.peachOrange])
         ]
         
         return LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
@@ -426,6 +429,34 @@ struct DashboardView: View {
         if score >= 0.75 { return "radiant" }
         if score >= 0.55 { return "steady" }
         return "reflective"
+    }
+
+    /// Calculates momentum as a percentage based on positive days and consistency
+    /// Formula: (Positive Days / Total Days) × 100 + Streak Bonus (max 10%)
+    /// Example: 7 wins out of 10 days = 70% + 3-day streak bonus = 73%
+    private func momentumScoreDisplay(for stats: DashboardStats) -> String {
+        let total = stats.wins + stats.losses
+        if total == 0 { return "50%" } // Default when no data
+
+        let baseScore = Double(stats.wins) / Double(total) // Win rate percentage
+        let streakBonus = min(0.1, Double(stats.currentStreak) * 0.01) // 1% per streak day, max 10%
+        let finalScore = min(1.0, baseScore + streakBonus) // Cap at 100%
+
+        return String(format: "%.0f%%", finalScore * 100)
+    }
+
+    private func momentumDescription(for stats: DashboardStats) -> String {
+        let total = stats.wins + stats.losses
+        if total == 0 { return "Track more days to see momentum" }
+
+        let winRate = Double(stats.wins) / Double(total)
+        if winRate >= 0.7 {
+            return "Strong positive momentum"
+        } else if winRate >= 0.5 {
+            return "Balanced momentum"
+        } else {
+            return "Building momentum"
+        }
     }
     
     private func loadStats() async {

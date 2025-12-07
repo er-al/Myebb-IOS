@@ -10,9 +10,12 @@ import SwiftUI
 struct RegisterView: View {
     @Environment(\.dismiss) var dismiss
     @StateObject private var authManager = AuthManager.shared
+    @State private var name = ""
     @State private var email = ""
     @State private var password = ""
     @State private var confirmPassword = ""
+    @State private var isPasswordVisible = false
+    @State private var isConfirmPasswordVisible = false
     @State private var isLoading = false
     @State private var errorMessage = ""
     
@@ -35,16 +38,32 @@ struct RegisterView: View {
                         .padding(.top, 16)
                         
                         VStack(spacing: 18) {
+                            TextField("", text: $name)
+                                .softFieldStyle(placeholder: "Name", icon: "person", text: $name)
+                                .textInputAutocapitalization(.words)
+
                             TextField("", text: $email)
                                 .softFieldStyle(placeholder: "Email", icon: "envelope", text: $email)
                                 .keyboardType(.emailAddress)
                                 .textInputAutocapitalization(.never)
                             
-                            SecureField("", text: $password)
-                                .softFieldStyle(placeholder: "Password", icon: "lock", text: $password)
-                            
-                            SecureField("", text: $confirmPassword)
-                                .softFieldStyle(placeholder: "Confirm Password", icon: "lock.rotation", text: $confirmPassword)
+                            Group {
+                                if isPasswordVisible {
+                                    TextField("", text: $password)
+                                } else {
+                                    SecureField("", text: $password)
+                                }
+                            }
+                            .softFieldStyle(placeholder: "Password", icon: "lock", text: $password, isPasswordField: true, isPasswordVisible: $isPasswordVisible)
+
+                            Group {
+                                if isConfirmPasswordVisible {
+                                    TextField("", text: $confirmPassword)
+                                } else {
+                                    SecureField("", text: $confirmPassword)
+                                }
+                            }
+                            .softFieldStyle(placeholder: "Confirm Password", icon: "lock.rotation", text: $confirmPassword, isPasswordField: true, isPasswordVisible: $isConfirmPasswordVisible)
                             
                             if !errorMessage.isEmpty {
                                 Text(errorMessage)
@@ -68,8 +87,8 @@ struct RegisterView: View {
                                 .foregroundColor(.white)
                                 .cornerRadius(14)
                             }
-                            .disabled(isLoading || email.isEmpty || password.isEmpty || confirmPassword.isEmpty)
-                            .opacity(isLoading || email.isEmpty || password.isEmpty || confirmPassword.isEmpty ? 0.6 : 1)
+                            .disabled(isLoading || name.isEmpty || email.isEmpty || password.isEmpty || confirmPassword.isEmpty)
+                            .opacity(isLoading || name.isEmpty || email.isEmpty || password.isEmpty || confirmPassword.isEmpty ? 0.6 : 1)
                         }
                         .padding(.horizontal, 4)
                     }
@@ -90,6 +109,12 @@ struct RegisterView: View {
         .tint(ColorTheme.stemGreen)
     }
     
+    private func isValidEmail(_ email: String) -> Bool {
+        let emailRegex = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
+        let emailPredicate = NSPredicate(format: "SELF MATCHES %@", emailRegex)
+        return emailPredicate.evaluate(with: email)
+    }
+
     private func handleRegister() {
         guard password == confirmPassword else {
             errorMessage = "Passwords do not match"
@@ -100,13 +125,18 @@ struct RegisterView: View {
             errorMessage = "Password must be at least 6 characters"
             return
         }
+
+        guard isValidEmail(email) else {
+            errorMessage = "Please enter a valid email address"
+            return
+        }
         
         isLoading = true
         errorMessage = ""
         
         Task {
             do {
-                let response = try await APIService.shared.register(email: email, password: password)
+                let response = try await APIService.shared.register(email: email, password: password, name: name)
                 await MainActor.run {
                     authManager.login(token: response.token, user: response.user)
                     isLoading = false

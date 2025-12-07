@@ -31,6 +31,12 @@ class AuthManager: ObservableObject {
         self.currentUser = user
         self.isAuthenticated = true
     }
+
+    func updateUser(_ user: User) {
+        saveUser(user)
+        self.currentUser = user
+        self.isAuthenticated = true
+    }
     
     func logout() {
         UserDefaults.standard.removeObject(forKey: tokenKey)

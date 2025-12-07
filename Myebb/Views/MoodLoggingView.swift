@@ -15,6 +15,7 @@ struct MoodLoggingView: View {
     @State private var errorMessage = ""
     @State private var showingHistory = false
     @State private var showingInsights = false
+    @State private var showingProfile = false
     @State private var moodNote = ""
     @State private var moodLevel = 0 // -5 to 5, 0 = neutral
     @State private var showEntrySheet = false
@@ -89,6 +90,9 @@ struct MoodLoggingView: View {
                         Button("Logout", systemImage: "arrow.right.square") {
                             authManager.logout()
                         }
+                        Button("Profile", systemImage: "person.crop.circle") {
+                            showingProfile = true
+                        }
                         Button("Open Insights", systemImage: "chart.bar") {
                             showingInsights = true
                         }
@@ -103,6 +107,9 @@ struct MoodLoggingView: View {
             }
             .sheet(isPresented: $showingInsights) {
                 DashboardView()
+            }
+            .sheet(isPresented: $showingProfile) {
+                ProfileView()
             }
             .sheet(isPresented: $showEntrySheet) {
                 entrySheet
@@ -149,6 +156,10 @@ struct MoodLoggingView: View {
                         .font(.headline)
                         .foregroundColor(ColorTheme.textPrimary)
                     Text("Slide the thermometer to capture how you feel.")
+                        .font(.subheadline)
+                        .foregroundColor(ColorTheme.textSecondary)
+                        .multilineTextAlignment(.center)
+                    Text("Double tap the circle if you feel neutral.")
                         .font(.subheadline)
                         .foregroundColor(ColorTheme.textSecondary)
                         .multilineTextAlignment(.center)

@@ -11,7 +11,9 @@ struct LoginView: View {
     @StateObject private var authManager = AuthManager.shared
     @State private var email = ""
     @State private var password = ""
+    @State private var isPasswordVisible = false
     @State private var isLoading = false
+    @State private var socialLoading: SocialProvider?
     @State private var errorMessage = ""
     @State private var showingRegister = false
     
@@ -43,8 +45,14 @@ struct LoginView: View {
                                     .keyboardType(.emailAddress)
                                     .textInputAutocapitalization(.never)
                                 
-                                SecureField("", text: $password)
-                                    .softFieldStyle(placeholder: "Password", icon: "lock", text: $password)
+                                Group {
+                                    if isPasswordVisible {
+                                        TextField("", text: $password)
+                                    } else {
+                                        SecureField("", text: $password)
+                                    }
+                                }
+                                .softFieldStyle(placeholder: "Password", icon: "lock", text: $password, isPasswordField: true, isPasswordVisible: $isPasswordVisible)
                                 
                                 if !errorMessage.isEmpty {
                                     Text(errorMessage)
@@ -71,6 +79,31 @@ struct LoginView: View {
                                 }
                                 .disabled(isLoading || email.isEmpty || password.isEmpty)
                                 .opacity(isLoading || email.isEmpty || password.isEmpty ? 0.6 : 1)
+
+                            VStack(spacing: 12) {
+                                Divider()
+                                    .padding(.vertical, 8)
+
+                                Button(action: handleGoogleLogin) {
+                                    HStack {
+                                        if socialLoading == .google {
+                                            ProgressView()
+                                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                        } else {
+                                            Image(systemName: "g.circle.fill")
+                                            Text("Continue with Google")
+                                                .fontWeight(.semibold)
+                                        }
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(Color.black.opacity(0.85))
+                                    .foregroundColor(.white)
+                                    .cornerRadius(14)
+                                }
+                                .disabled(socialLoading != nil)
+                                .opacity(socialLoading != nil ? 0.6 : 1)
+                            }
                                 
                                 Button(action: { showingRegister = true }) {
                                     Text("Create an account")
@@ -126,6 +159,28 @@ struct LoginView: View {
             }
         }
     }
+
+    private func handleGoogleLogin() {
+        socialLoading = .google
+        errorMessage = ""
+
+        Task {
+            do {
+                let token = try await SocialAuthService.shared.signInWithGoogle()
+                let response = try await APIService.shared.loginWithGoogle(idToken: token)
+                await MainActor.run {
+                    authManager.login(token: response.token, user: response.user)
+                    socialLoading = nil
+                }
+            } catch {
+                await MainActor.run {
+                    socialLoading = nil
+                    errorMessage = (error as? LocalizedError)?.errorDescription ?? "Google sign-in failed. Please try again."
+                }
+            }
+        }
+    }
+
 }
 
 #Preview {
