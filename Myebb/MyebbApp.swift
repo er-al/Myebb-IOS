@@ -12,6 +12,8 @@ struct MyebbApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .tint(ColorTheme.stemGreen)
+                .preferredColorScheme(.light)
         }
     }
 }
